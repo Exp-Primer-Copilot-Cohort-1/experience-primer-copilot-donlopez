@@ -1,67 +1,71 @@
 // create web server
-// create a router
-// create a route for GET /comments
-// create a route for POST /comments
-// create a route for GET /comments/:id
-// create a route for PUT /comments/:id
-// create a route for DELETE /comments/:id
-// create a route for GET /comments/:id/flag
-// create a route for POST /comments/:id/flag
-// create a route for GET /comments/:id/flagged
-// create a route for GET /comments/:id/flagged/:id
-// create a route for DELETE /comments/:id/flagged/:id
-// create a route for GET /comments/:id/flagged/:id/resolve
-// create a route for POST /comments/:id/flagged/:id/resolve
+// 1. Load http module
+var http = require('http');
+var url = require('url');
+var fs = require('fs');
+var path = require('path');
+var comments = require('./comments');
 
-const express = require('express');
-const app = express();
-const router = express.Router();
-const bodyParser = require('body-parser');
-const comments = require('./comments');
-
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
-
-router.get('/comments', (req, res) => {
-  res.send(comments.getComments());
-});
-
-router.post('/comments', (req, res) => {
-  res.send(comments.addComment(req.body));
-});
-
-router.get('/comments/:id', (req, res) => {
-  res.send(comments.getComment(req.params.id));
-});
-
-router.put('/comments/:id', (req, res) => {
-  res.send(comments.updateComment(req.params.id, req.body));
-});
-
-router.delete('/comments/:id', (req, res) => {
-  res.send(comments.deleteComment(req.params.id));
-});
-
-router.get('/comments/:id/flag', (req, res) => {
-  res.send(comments.flagComment(req.params.id));
-});
-
-router.post('/comments/:id/flag', (req, res) => {
-  res.send(comments.flagComment(req.params.id));
-});
-
-router.get('/comments/:id/flagged', (req, res) => {
-    res.send(comments.getFlaggedComments(req.params.id));
-});
-
-router.get('/comments/:id/flagged/:id', (req, res) => {
-    res.send(comments.getFlaggedComment(req.params.id, req.params.id));
-});
-
-router.delete('/comments/:id/flagged/:id', (req, res) => {
-    res.send(comments.deleteFlaggedComment(req.params.id, req.params.id));
-});
-
-router.get('/comments/:id/flagged/:id/resolve', (req, res) => {
-    res.send(comments.resolveFlaggedComment(req.params.id, req.params.id));
-});
+http.createServer(function(request, response) {
+  var urlPath = url.parse(request.url).pathname;
+  console.log(urlPath);
+  if (urlPath === '/comments') {
+    if (request.method === 'POST') {
+      var body = '';
+      request.on('data', function(data) {
+        body += data;
+      });
+      request.on('end', function() {
+        var comment = JSON.parse(body);
+        comments.add(comment);
+        response.writeHead(200, {
+          'Content-Type': 'text/plain',
+          'Access-Control-Allow-Origin': '*'
+        });
+        response.end('Comment added');
+      });
+    } else if (request.method === 'GET') {
+      var allComments = comments.getAll();
+      var allCommentsStr = JSON.stringify(allComments);
+      response.writeHead(200, {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*'
+      });
+      response.end(allCommentsStr);
+    }
+  } else {
+    var filePath = '.' + urlPath;
+    if (filePath === './') {
+      filePath = './index.html';
+    }
+    var extname = path.extname(filePath);
+    var contentType = 'text/html';
+    switch (extname) {
+      case '.js':
+        contentType = 'text/javascript';
+        break;
+      case '.css':
+        contentType = 'text/css';
+        break;
+    }
+    fs.exists(filePath, function(exists) {
+      if (exists) {
+        fs.readFile(filePath, function(error, content) {
+          if (error) {
+            response.writeHead(500);
+            response.end();
+          } else {
+            response.writeHead(200, {
+              'Content-Type': contentType
+            });
+            response.end(content, 'utf-8');
+          }
+        });
+      } else {
+        response.writeHead(404);
+        response.end();
+      }
+    });
+  }
+}).listen(8080);
+console.log('Server running at http://');
